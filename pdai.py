@@ -5,3 +5,5 @@ The Personal Digital Assistant (PDAI) is a software application designed to assi
 
 The AI is used to analyze Receipts and can also provide insights and Analysis of the Budget.
 '''
+import os
+from dotenv import load_dotenv
