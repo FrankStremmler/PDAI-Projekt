@@ -6,4 +6,20 @@ The Personal Digital Assistant (PDAI) is a software application designed to assi
 The AI is used to analyze Receipts and can also provide insights and Analysis of the Budget.
 '''
 import os
+import sys
 from dotenv import load_dotenv
+
+load_dotenv()
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+
+def main():
+    from pdai_gui import run_app
+    return run_app()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

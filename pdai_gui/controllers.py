@@ -1,8 +1,19 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QListWidgetItem
 
 
 class MainController:
+    ICONS = {
+        "home": ":/icons/home.svg",
+        "calendar": ":/icons/calendar.svg",
+        "contacts": ":/icons/contacts.svg",
+        "cloud": ":/icons/cloud.svg",
+        "notes": ":/icons/notes.svg",
+        "household": ":/icons/household.svg",
+        "budget": ":/icons/budget.svg",
+    }
+
     def __init__(self, model, view):
         self.model = model
         self.view = view
@@ -10,19 +21,31 @@ class MainController:
         self.view.sidebar.currentRowChanged.connect(self._on_selection_changed)
 
     def _populate(self):
+        self.view.add_collapse_item("Einklappen", QIcon(":/icons/collapse.svg"))
+        self.view.add_spacer(24)
+
         for entry in self.model.list():
             widget = entry.factory()
-            # try to use some sensible default icons via QStyle
-            icon_id = None
-            if entry.id == "home":
-                from PySide6.QtWidgets import QStyle
+            icon_path = self.ICONS.get(entry.id)
+            icon = QIcon(icon_path) if icon_path else None
+            self.view.add_app(entry.name, widget, icon, entry_id=entry.id)
 
-                icon_id = QStyle.SP_DesktopIcon
-            elif entry.id == "budget":
-                from PySide6.QtWidgets import QStyle
-
-                icon_id = QStyle.SP_DriveHDIcon
-            self.view.add_app(entry.name, widget, icon_id)
+        self.view.add_spacer(16)
+        self.view.add_exit_item("Beenden", QIcon(":/icons/exit.svg"))
 
     def _on_selection_changed(self, index: int):
+        item = self.view.sidebar.item(index)
+        if item is None:
+            return
+
+        role = item.data(Qt.UserRole)
+        if role == "exit":
+            self.view.close()
+            return
+
+        if role == "collapse":
+            self.view.toggle_sidebar()
+            self.view.restore_last_app_selection()
+            return
+
         self.view.set_current_index(index)
