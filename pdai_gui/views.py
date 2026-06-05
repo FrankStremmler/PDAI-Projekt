@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PDAI — Startseite")
         self.resize(1000, 600)
 
-        self.expanded_width = 220
+        self.expanded_width = 200
         self.collapsed_width = 70
         self.sidebar_collapsed = False
 
@@ -28,9 +28,10 @@ class MainWindow(QMainWindow):
 
         # Sidebar wrapper with toggle icon
         self.side_panel = QWidget()
+        # self.side_panel.setFixedWidth(self.expanded_width)
         self.side_panel.setMaximumWidth(self.expanded_width)
-        self.side_panel.setMinimumWidth(self.collapsed_width)
-        self.side_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.side_panel.setMinimumWidth(self.expanded_width)
+        self.side_panel.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
 
         self.sidebar = QListWidget()
         self.sidebar.setIconSize(self.sidebar.iconSize())
@@ -49,7 +50,7 @@ class MainWindow(QMainWindow):
 
         # Main area where sub-apps are shown
         self.stack = QStackedWidget()
-        self.stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Layout
         h = QHBoxLayout(central)
@@ -128,11 +129,11 @@ class MainWindow(QMainWindow):
         target_width = self.collapsed_width if collapsed else self.expanded_width
         if animate:
             self._animation.stop()
-            self._animation.setStartValue(self.side_panel.maximumWidth())
+            self._animation.setStartValue(self.side_panel.width())
             self._animation.setEndValue(target_width)
             self._animation.start()
         else:
-            self.side_panel.setMaximumWidth(target_width)
+            self.side_panel.setFixedWidth(target_width)
 
         for index in range(self.sidebar.count()):
             item = self.sidebar.item(index)

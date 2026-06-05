@@ -1,4 +1,8 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from core.part_calendar.cal_calendar import get_today_events
+from core.part_calendar.cal_gui import CalendarAppView, DynamicCalendarTableModel
+from core.part_calendar.cal_main import CalendarController
+from core.part_household_budget import HouseholdBudgetView, HouseholdBudgetController
 
 
 class HomeWidget(QWidget):
@@ -13,6 +17,30 @@ class HomeWidget(QWidget):
         text.setWordWrap(True)
         layout.addWidget(title)
         layout.addWidget(text)
+
+        today_title = QLabel("Aktuelle Termine heute")
+        today_title.setStyleSheet("font-size: 16px; font-weight: bold; margin-top: 12px;")
+        layout.addWidget(today_title)
+
+        try:
+            events = get_today_events()
+            if events:
+                for event in events:
+                    event_label = QLabel(
+                        f"{event.start_time} - {event.title} ({event.location})"
+                    )
+                    event_label.setWordWrap(True)
+                    layout.addWidget(event_label)
+            else:
+                none_label = QLabel("Keine Termine für heute.")
+                none_label.setWordWrap(True)
+                layout.addWidget(none_label)
+        except Exception:
+            error_label = QLabel(
+                "Kalenderdaten sind aktuell nicht verfügbar. Bitte prüfe deine Google-Verbindung."
+            )
+            error_label.setWordWrap(True)
+            layout.addWidget(error_label)
 
 
 class BudgetWidget(QWidget):
@@ -33,14 +61,12 @@ class CalendarWidget(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        title = QLabel("Kalender")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Hier wird später der Kalender angezeigt. Dies ist ein Dummy-Widget für die Kalender-App."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
+
+        self.calendar_view = CalendarAppView()
+        self.qt_model = DynamicCalendarTableModel()
+        self.calendar_controller = CalendarController(self.calendar_view, self.qt_model)
+
+        layout.addWidget(self.calendar_view)
 
 
 class ContactsWidget(QWidget):
@@ -88,12 +114,8 @@ class NotesWidget(QWidget):
 class HouseholdBookWidget(QWidget):
     def __init__(self):
         super().__init__()
+        self.household_view = HouseholdBudgetView()
+        self.household_controller = HouseholdBudgetController(self.household_view)
+
         layout = QVBoxLayout(self)
-        title = QLabel("Haushaltsbuch")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Dies ist ein Dummy für das Haushaltsbuch mit Ausgaben und Budgetverwaltung."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
+        layout.addWidget(self.household_view)

@@ -8,6 +8,7 @@ The AI is used to analyze Receipts and can also provide insights and Analysis of
 import os
 import sys
 from dotenv import load_dotenv
+from openai import api_key
 
 load_dotenv()
 
