@@ -1,4 +1,5 @@
 import os
+import re
 import datetime
 from zoneinfo import ZoneInfo
 from typing import List, Optional
@@ -66,9 +67,26 @@ def get_google_credentials() -> Credentials:
     return creds
 
 
+def _normalize_datetime_string(value: str) -> str:
+    if not value:
+        return value
+
+    # Fix malformed strings like "2026-06-12 07:45T00:00:00"
+    if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}T', value):
+        return value.split('T')[0]
+
+    # Fix date/time values with space instead of T
+    if ' ' in value and 'T' not in value and re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$', value):
+        return value.replace(' ', 'T')
+
+    return value
+
+
 def _parse_google_datetime(value: str) -> str:
     if not value:
         return ''
+
+    value = _normalize_datetime_string(value)
 
     # All-day events liefern nur ein Datum ohne Uhrzeit.
     if 'T' not in value:
@@ -93,16 +111,31 @@ def _get_today_date_range() -> tuple[str, str]:
     return start.isoformat(), end.isoformat()
 
 
+def _get_all_calendars(service):
+    calendars = []
+    page_token = None
+    while True:
+        response = service.calendarList().list(pageToken=page_token).execute()
+        calendars.extend(response.get('items', []))
+        page_token = response.get('nextPageToken')
+        if not page_token:
+            break
+    return calendars
+
+
 def get_today_events() -> List[CalendarEvent]:
     creds = get_google_credentials()
     service = build('calendar', 'v3', credentials=creds)
 
     time_min, time_max = _get_today_date_range()
-    calendars = service.calendarList().list().execute().get('items', [])
+    calendars = _get_all_calendars(service)
 
     mapped_events: List[CalendarEvent] = []
     for cal in calendars:
-        cal_id = cal['id']
+        cal_id = cal.get('id')
+        if not cal_id:
+            continue
+
         try:
             events_obj = service.events().list(
                 calendarId=cal_id,
@@ -128,7 +161,70 @@ def get_today_events() -> List[CalendarEvent]:
                 location=ev.get('location', 'Keine Angabe')
             ))
 
-    return sorted(mapped_events, key=lambda ev: ev.start_time)
+    return sorted(mapped_events, key=lambda ev: _parse_event_datetime(ev.start_time))
+
+
+def _parse_event_datetime(value: str) -> datetime.datetime:
+    if not value:
+        return datetime.datetime.max.replace(tzinfo=ZoneInfo('Europe/Berlin'))
+
+    value = _normalize_datetime_string(value)
+
+    if value.endswith('Z'):
+        dt = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    elif 'T' in value:
+        dt = datetime.datetime.fromisoformat(value)
+    else:
+        dt = datetime.datetime.fromisoformat(value + 'T00:00:00')
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo('Europe/Berlin'))
+    else:
+        dt = dt.astimezone(ZoneInfo('Europe/Berlin'))
+
+    return dt
+
+
+def get_upcoming_events(limit: int = 5) -> List[CalendarEvent]:
+    creds = get_google_credentials()
+    service = build('calendar', 'v3', credentials=creds)
+
+    now = datetime.datetime.now(ZoneInfo('Europe/Berlin')).isoformat()
+    calendars = _get_all_calendars(service)
+
+    mapped_events: List[CalendarEvent] = []
+    for cal in calendars:
+        cal_id = cal.get('id')
+        if not cal_id:
+            continue
+
+        try:
+            events_obj = service.events().list(
+                calendarId=cal_id,
+                timeMin=now,
+                singleEvents=True,
+                orderBy='startTime',
+                maxResults=50
+            ).execute()
+            raw_events = events_obj.get('items', [])
+        except Exception:
+            raw_events = []
+
+        for ev in raw_events:
+            start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date', '')
+            end = ev.get('end', {}).get('dateTime') or ev.get('end', {}).get('date', '')
+            start_clean = _parse_google_datetime(start)
+            end_clean = _parse_google_datetime(end)
+            mapped_events.append(CalendarEvent(
+                id=ev.get('id', ''),
+                title=ev.get('summary', 'Kein Titel'),
+                start_time=start_clean,
+                end_time=end_clean,
+                location=ev.get('location', 'Keine Angabe')
+            ))
+
+    mapped_events.sort(key=lambda ev: _parse_event_datetime(ev.start_time))
+    return mapped_events[:limit]
 
 
 def _format_google_event_time(value: str) -> dict:

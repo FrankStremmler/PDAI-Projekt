@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from typing import List
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 
 
@@ -24,6 +26,8 @@ class DriveController:
         self.current_items: List[DriveItem] = []
 
         self._init_service_and_bind()
+        if hasattr(self.view, "attach_controller"):
+            self.view.attach_controller(self)
 
     def _init_service_and_bind(self):
         try:
@@ -120,6 +124,79 @@ class DriveController:
         # (Path tracking can be added later.)
         self.current_folder_id = "root"
         self.refresh()
+
+    def upload_files(self, file_paths: list[str]):
+        if self.service is None:
+            return
+
+        successes = []
+        failures = []
+
+        for path in file_paths:
+            if not os.path.exists(path):
+                failures.append((path, "Datei existiert nicht"))
+                continue
+
+            if os.path.isdir(path):
+                failures.append((path, "Ordner werden nicht unterstützt"))
+                continue
+
+            try:
+                file_name = os.path.basename(path)
+                media_body = MediaFileUpload(path, resumable=True)
+                body = {
+                    "name": file_name,
+                    "parents": [self.current_folder_id],
+                }
+                self.service.files().create(body=body, media_body=media_body, fields="id, name").execute()
+                successes.append(file_name)
+            except Exception as e:
+                failures.append((path, str(e)))
+
+        self.refresh()
+
+        if successes:
+            QMessageBox.information(
+                self.view,
+                "Upload abgeschlossen",
+                f"Hochgeladen:\n{chr(10).join(successes)}"
+            )
+
+        if failures:
+            QMessageBox.warning(
+                self.view,
+                "Upload teilweise fehlgeschlagen",
+                "\n".join([f"{path}: {reason}" for path, reason in failures])
+            )
+
+    def download_item(self, drive_item: DriveItem):
+        if self.service is None:
+            return
+
+        if drive_item.is_folder:
+            QMessageBox.information(self.view, "Download nicht möglich", "Ordner können nicht direkt heruntergeladen werden.")
+            return
+
+        default_name = drive_item.name or drive_item.id
+        target_path, _ = QFileDialog.getSaveFileName(self.view, "Datei herunterladen", default_name)
+        if not target_path:
+            return
+
+        try:
+            if drive_item.mime_type.startswith("application/vnd.google-apps."):
+                request = self.service.files().export(fileId=drive_item.id, mimeType="application/pdf")
+            else:
+                request = self.service.files().get_media(fileId=drive_item.id)
+
+            with open(target_path, "wb") as file_handle:
+                downloader = MediaIoBaseDownload(file_handle, request)
+                done = False
+                while not done:
+                    status, done = downloader.next_chunk()
+
+            QMessageBox.information(self.view, "Download abgeschlossen", f"Die Datei wurde gespeichert unter:\n{target_path}")
+        except Exception as e:
+            QMessageBox.warning(self.view, "Download fehlgeschlagen", f"Die Datei konnte nicht heruntergeladen werden:\n{e}")
 
     def create_folder(self):
         service = self.service

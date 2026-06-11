@@ -1,8 +1,8 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox
 
 from core.part_calendar.cal_gui import CalendarAppView, DynamicCalendarTableModel
 from core.part_calendar.cal_main import CalendarController
-from core.part_calendar.cal_calendar import get_today_events
+from core.part_calendar.cal_calendar import get_today_events, get_upcoming_events
 
 from core.part_contacts.contact_controller import ContactController
 from core.part_contacts.contact_gui import DynamicContactTableModel
@@ -30,29 +30,57 @@ class HomeWidget(QWidget):
         layout.addWidget(title)
         layout.addWidget(text)
 
-        today_title = QLabel("Aktuelle Termine heute")
-        today_title.setStyleSheet("font-size: 16px; font-weight: bold; margin-top: 12px;")
-        layout.addWidget(today_title)
+        boxes = QHBoxLayout()
+
+        today_box = QGroupBox("Termine heute")
+        today_box.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; }")
+        today_layout = QVBoxLayout(today_box)
+
+        upcoming_box = QGroupBox("Nächste Termine")
+        upcoming_box.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; }")
+        upcoming_layout = QVBoxLayout(upcoming_box)
 
         try:
-            events = get_today_events()
-            if events:
-                for event in events:
-                    event_label = QLabel(
-                        f"{event.start_time} - {event.title} ({event.location})"
-                    )
+            today_events = get_today_events()
+        except Exception as e:
+            today_error_label = QLabel(
+                f"Kalenderdaten für heute konnten nicht geladen werden: {e}"
+            )
+            today_error_label.setWordWrap(True)
+            today_layout.addWidget(today_error_label)
+        else:
+            if today_events:
+                for event in today_events:
+                    event_label = QLabel(f"{event.start_time} - {event.title} ({event.location})")
                     event_label.setWordWrap(True)
-                    layout.addWidget(event_label)
+                    today_layout.addWidget(event_label)
             else:
                 none_label = QLabel("Keine Termine für heute.")
                 none_label.setWordWrap(True)
-                layout.addWidget(none_label)
-        except Exception:
-            error_label = QLabel(
-                "Kalenderdaten sind aktuell nicht verfügbar. Bitte prüfe deine Google-Verbindung."
+                today_layout.addWidget(none_label)
+
+        try:
+            upcoming_events = get_upcoming_events(5)
+        except Exception as e:
+            upcoming_error_label = QLabel(
+                f"Kommende Termine konnten nicht geladen werden: {e}"
             )
-            error_label.setWordWrap(True)
-            layout.addWidget(error_label)
+            upcoming_error_label.setWordWrap(True)
+            upcoming_layout.addWidget(upcoming_error_label)
+        else:
+            if upcoming_events:
+                for event in upcoming_events:
+                    event_label = QLabel(f"{event.start_time} - {event.title} ({event.location})")
+                    event_label.setWordWrap(True)
+                    upcoming_layout.addWidget(event_label)
+            else:
+                none_label = QLabel("Keine kommenden Termine.")
+                none_label.setWordWrap(True)
+                upcoming_layout.addWidget(none_label)
+
+        boxes.addWidget(today_box)
+        boxes.addWidget(upcoming_box)
+        layout.addLayout(boxes)
 
 
 class CalendarWidget(QWidget):
