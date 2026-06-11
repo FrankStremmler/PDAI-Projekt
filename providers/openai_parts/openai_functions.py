@@ -48,7 +48,7 @@ def upload_file_to_ai(file_path: str) -> dict:
         dict: The response from the AI after uploading the file, containing the file type and the file content (either as a URL or as a base64 string).
     '''
     file_type = global_functions.get_file_type(file_path)
-    if file_type in ["image/jpeg", "image/png", "application/pdf"]:  # Example of supported file types
+    if file_type in ["application/pdf"]:  # Example of supported file types
         # Upload the file as is (this is a placeholder, actual upload code will depend on the AI's API)
         return {
             "file_type": file_type,

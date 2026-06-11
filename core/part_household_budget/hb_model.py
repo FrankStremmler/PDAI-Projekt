@@ -41,3 +41,10 @@ class RegularEntry:
     period_id: int
     amount: float
     description: str
+
+def save_receipt_path(file_path: str) -> Optional[int]:
+    # Hier würden Sie die Logik implementieren, um den Pfad in der Datenbank zu speichern
+    # und eine neue Receipt-ID zurückzugeben. Zum Beispiel:
+    # new_receipt_id = database.insert_receipt(file_path)
+    # return new_receipt_id
+    pass    

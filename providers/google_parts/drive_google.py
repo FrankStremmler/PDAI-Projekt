@@ -22,12 +22,12 @@ def list_files(service, folder_id='root'):
     items = results.get('files', [])
 
     if not items:
-        print('\n--- Dieser Ordner ist leer ---')
+        # print('\n--- Dieser Ordner ist leer ---')
         return []
 
-    print(f"\nInhalt von Ordner [{folder_id}]:")
-    print(f"{'NAME':<40} {'TYP':<20} {'ID'}")
-    print("-" * 80)
+    # print(f"\nInhalt von Ordner [{folder_id}]:")
+    # print(f"{'NAME':<40} {'TYP':<20} {'ID'}")
+    # print("-" * 80)
 
     for item in items:
         is_folder = item['mimeType'] == 'application/vnd.google-apps.folder'

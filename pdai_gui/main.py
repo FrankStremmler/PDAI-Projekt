@@ -11,12 +11,14 @@ from pdai_gui.models import AppModel
 from pdai_gui.subapps import (
     BudgetWidget,
     CalendarWidget,
-    CloudStorageWidget,
     ContactsWidget,
+    CloudStorageWidget,
     HomeWidget,
     HouseholdBookWidget,
     NotesWidget,
 )
+
+
 from pdai_gui.views import MainWindow
 
 import pdai_gui.resources_rc  # load Qt resource icons
@@ -29,9 +31,11 @@ def create_application():
     model.register("calendar", "Kalender", CalendarWidget)
     model.register("contacts", "Kontakte", ContactsWidget)
     model.register("cloud", "Cloud-Storage", CloudStorageWidget)
+
+
     model.register("notes", "Notizen", NotesWidget)
     model.register("household", "Haushaltsbuch", HouseholdBookWidget)
-    model.register("budget", "Budgetverwaltung", BudgetWidget)
+
 
     view = MainWindow()
     controller = MainController(model, view)

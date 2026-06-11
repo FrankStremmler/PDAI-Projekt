@@ -1,11 +1,23 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from core.part_calendar.cal_calendar import get_today_events
+
 from core.part_calendar.cal_gui import CalendarAppView, DynamicCalendarTableModel
 from core.part_calendar.cal_main import CalendarController
+from core.part_calendar.cal_calendar import get_today_events
+
+from core.part_contacts.contact_controller import ContactController
+from core.part_contacts.contact_gui import DynamicContactTableModel
+from core.part_contacts.contact_view import ContactAppView
+
+from core.part_cloud.drive_gui import DriveCloudWidget, DriveItemsTableModel
+from core.part_cloud.drive_controller import DriveController
+
+
+
 from core.part_household_budget import HouseholdBudgetView, HouseholdBudgetController
 
 
 class HomeWidget(QWidget):
+
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -43,21 +55,8 @@ class HomeWidget(QWidget):
             layout.addWidget(error_label)
 
 
-class BudgetWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        title = QLabel("Budgetverwaltung")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Hier können später Budget-Analysen, Ausgaben und Haushaltstracker eingebunden werden."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
-
-
 class CalendarWidget(QWidget):
+
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -73,31 +72,18 @@ class ContactsWidget(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        title = QLabel("Kontakte")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Hier werden später Kontakte und Adressinformationen verwaltet."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
 
+        # MVC Wiring: View + Model + Controller
+        self.view = ContactAppView()
+        self.qt_model = DynamicContactTableModel()
+        self.controller = ContactController(self.view, self.qt_model)
 
-class CloudStorageWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        title = QLabel("Cloud-Storage")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Hier werden später Cloud-Speicher und Synchronisation geöffnet."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
+        layout.addWidget(self.view)
+
 
 
 class NotesWidget(QWidget):
+
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
@@ -111,7 +97,52 @@ class NotesWidget(QWidget):
         layout.addWidget(text)
 
 
+class CloudStorageWidget(QWidget):
+
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+
+        self.view = DriveCloudWidget()
+        self.qt_model = DriveItemsTableModel()
+        self.controller = DriveController(self.view, self.qt_model)
+        self.view.attach_controller(self.controller)
+        self.view.set_qt_model(self.qt_model)
+
+        layout.addWidget(self.view)
+
+
+
+
+class DriveContactsWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("(wird aktuell nicht verwendet)")
+        layout.addWidget(title)
+
+
+
+
+
+
+
+class BudgetWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout(self)
+        title = QLabel("Budgetverwaltung")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        text = QLabel(
+            "Hier können später Budget-Analysen, Ausgaben und Haushaltstracker eingebunden werden."
+        )
+        text.setWordWrap(True)
+        layout.addWidget(title)
+        layout.addWidget(text)
+
+
 class HouseholdBookWidget(QWidget):
+
     def __init__(self):
         super().__init__()
         self.household_view = HouseholdBudgetView()
@@ -119,3 +150,4 @@ class HouseholdBookWidget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.household_view)
+
