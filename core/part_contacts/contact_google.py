@@ -3,7 +3,7 @@ from typing import List
 
 from core.part_contacts.contact_model import Contact, ContactGroup, AccountContactData
 
-from providers.google_parts.google_constants import GOOGLE_SCOPES, CONFIG_PATH
+from standards_and_constants.google_constants import GOOGLE_SCOPES, CONFIG_PATH
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials

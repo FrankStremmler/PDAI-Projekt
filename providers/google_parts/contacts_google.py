@@ -4,7 +4,7 @@ Die Bibliothek verwendet die Google Contacts API v3, um auf die Google Kontakte 
 '''
 # externe Bibliotheken
 from providers.google_parts.google_base import create_service
-from providers.google_parts import google_constants as google_constants
+from standards_and_constants import google_constants as google_constants
 
 # volle Berechtigung für Zugriff auf Google Drive API
 SCOPES = google_constants.GOOGLE_SCOPES

@@ -1,9 +1,30 @@
 from typing import List
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QDateTime
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QTableView, QVBoxLayout, QHBoxLayout,
     QWidget, QLabel, QPushButton, QListWidget, QStackedWidget, QFrame,
     QDialog, QFormLayout, QLineEdit, QDialogButtonBox, QMessageBox, QDateTimeEdit
+)
+from standards_and_constants.view_constants import (
+
+    STYLE_SECTION_BOLD,
+    STYLE_SUBTITLE_BOLD,
+    STYLE_DELETE_BUTTON,
+    DIALOG_MIN_WIDTH,
+    CALENDAR_SIDEBAR_WIDTH,
+    CALENDAR_WINDOW_WIDTH,
+    CALENDAR_WINDOW_HEIGHT,
+    CALENDAR_SIDEBAR_STYLE,
+    CALENDAR_ACCOUNT_LABEL_STYLE,
+    CALENDAR_NAV_BUTTON_STYLE,
+    CALENDAR_SECTION_LABEL_STYLE,
+    CALENDAR_LIST_STYLE,
+    CALENDAR_CREATE_EVENT_BUTTON_STYLE,
+    CALENDAR_TILE_BUTTON_STYLE,
+    CALENDAR_NEW_EVENT_BUTTON_STYLE,
+    CALENDAR_DATETIME_FORMAT,
+    COLOR_CALENDAR_TILE_BG,
 )
 from core.part_calendar.cal_calendar import CalendarEvent, CalendarContainer
 
@@ -47,7 +68,7 @@ class EventEditDialog(QDialog):
     def __init__(self, event: CalendarEvent, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Termin bearbeiten")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(DIALOG_MIN_WIDTH)
 
         self._event = event
         layout = QFormLayout(self)
@@ -58,9 +79,9 @@ class EventEditDialog(QDialog):
         self.end_edit = QDateTimeEdit(self._parse_datetime(event.end_time))
         self.location_edit = QLineEdit(event.location)
 
-        self.start_edit.setDisplayFormat('yyyy-MM-dd HH:mm')
+        self.start_edit.setDisplayFormat(CALENDAR_DATETIME_FORMAT)
         self.start_edit.setCalendarPopup(True)
-        self.end_edit.setDisplayFormat('yyyy-MM-dd HH:mm')
+        self.end_edit.setDisplayFormat(CALENDAR_DATETIME_FORMAT)
         self.end_edit.setCalendarPopup(True)
 
         layout.addRow("ID:", self.id_label)
@@ -71,7 +92,7 @@ class EventEditDialog(QDialog):
 
         button_layout = QHBoxLayout()
         self.delete_button = QPushButton("Termin löschen")
-        self.delete_button.setStyleSheet("color: white; background-color: #c62828; padding: 6px 12px; border-radius: 4px;")
+        self.delete_button.setStyleSheet(STYLE_DELETE_BUTTON)
         self.delete_button.clicked.connect(self.on_delete_clicked)
         button_layout.addWidget(self.delete_button)
 
@@ -106,7 +127,7 @@ class EventEditDialog(QDialog):
     def _parse_datetime(self, value: str) -> QDateTime:
         if not value:
             return QDateTime.currentDateTime()
-        dt = QDateTime.fromString(value, 'yyyy-MM-dd HH:mm')
+        dt = QDateTime.fromString(value, CALENDAR_DATETIME_FORMAT)
         if dt.isValid():
             return dt
         dt = QDateTime.fromString(value, Qt.ISODate)
@@ -120,14 +141,14 @@ class EventEditDialog(QDialog):
             return QDateTime.currentDateTime()
 
     def _format_datetime(self, widget: QDateTimeEdit) -> str:
-        return widget.dateTime().toString('yyyy-MM-dd HH:mm')
+        return widget.dateTime().toString(CALENDAR_DATETIME_FORMAT)
 
 
 class EventCreateDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Neuen Termin erstellen")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(DIALOG_MIN_WIDTH)
 
         layout = QFormLayout(self)
         self.title_edit = QLineEdit()
@@ -135,9 +156,9 @@ class EventCreateDialog(QDialog):
         self.end_edit = QDateTimeEdit(QDateTime.currentDateTime().addSecs(3600))
         self.location_edit = QLineEdit()
 
-        self.start_edit.setDisplayFormat('yyyy-MM-dd HH:mm')
+        self.start_edit.setDisplayFormat(CALENDAR_DATETIME_FORMAT)
         self.start_edit.setCalendarPopup(True)
-        self.end_edit.setDisplayFormat('yyyy-MM-dd HH:mm')
+        self.end_edit.setDisplayFormat(CALENDAR_DATETIME_FORMAT)
         self.end_edit.setCalendarPopup(True)
 
         layout.addRow("Titel:", self.title_edit)
@@ -154,8 +175,8 @@ class EventCreateDialog(QDialog):
         return CalendarEvent(
             id="",
             title=self.title_edit.text().strip() or "Neuer Termin",
-            start_time=self.start_edit.dateTime().toString('yyyy-MM-dd HH:mm'),
-            end_time=self.end_edit.dateTime().toString('yyyy-MM-dd HH:mm'),
+            start_time=self.start_edit.dateTime().toString(CALENDAR_DATETIME_FORMAT),
+            end_time=self.end_edit.dateTime().toString(CALENDAR_DATETIME_FORMAT),
             location=self.location_edit.text().strip() or "Keine Angabe",
         )
 
@@ -164,7 +185,7 @@ class CalendarAppView(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Google Calendar - Dashboard & Sidebar")
-        self.resize(900, 550)
+        self.resize(CALENDAR_WINDOW_WIDTH, CALENDAR_WINDOW_HEIGHT)
 
         # Hauptlayout für das eingebettete Kalender-Widget
         main_layout = QHBoxLayout(self)
@@ -173,26 +194,27 @@ class CalendarAppView(QWidget):
 
         # --- LINKS: SIDEBAR ---
         self.sidebar = QFrame()
-        self.sidebar.setFixedWidth(220)
-        self.sidebar.setStyleSheet("background-color: #202124; color: white;")
+        self.sidebar.setFixedWidth(CALENDAR_SIDEBAR_WIDTH)
+        self.sidebar.setStyleSheet(CALENDAR_SIDEBAR_STYLE)
+        self.sidebar.setFont(QFont("", 9))
         sidebar_layout = QVBoxLayout(self.sidebar)
 
         self.account_label = QLabel("Konto: -")
-        self.account_label.setStyleSheet("color: #9aa0a6; padding: 10px; font-weight: bold;")
+        self.account_label.setStyleSheet(CALENDAR_ACCOUNT_LABEL_STYLE)
         sidebar_layout.addWidget(self.account_label)
 
         # Navigation-Buttons
         self.btn_dashboard = QPushButton("📊 Übersicht (Dashboard)")
-        self.btn_dashboard.setStyleSheet("text-align: left; padding: 10px; background: none; border: none; color: white; font-size: 13px;")
+        self.btn_dashboard.setStyleSheet(CALENDAR_NAV_BUTTON_STYLE)
         sidebar_layout.addWidget(self.btn_dashboard)
 
         # Trennlinie & Kalender-Liste in Sidebar
         cal_section_label = QLabel("Meine Kalender:")
-        cal_section_label.setStyleSheet("color: #9aa0a6; padding: 10px 10px 20px 10px; font-size: 11px; text-transform: uppercase;")
+        cal_section_label.setStyleSheet(CALENDAR_SECTION_LABEL_STYLE)
         sidebar_layout.addWidget(cal_section_label)
 
         self.calendar_list_widget = QListWidget()
-        self.calendar_list_widget.setStyleSheet("background: transparent; border: none; color: white; padding-left: 5px;")
+        self.calendar_list_widget.setStyleSheet(CALENDAR_LIST_STYLE)
         sidebar_layout.addWidget(self.calendar_list_widget)
 
         main_layout.addWidget(self.sidebar)
@@ -205,12 +227,13 @@ class CalendarAppView(QWidget):
         self.dashboard_page = QWidget()
         self.dashboard_layout = QVBoxLayout(self.dashboard_page)
         self.dashboard_title = QLabel("Wähle einen Kalender oder nutze die Übersicht")
-        self.dashboard_title.setStyleSheet("font-size: 18px; font-weight: bold; padding: 20px;")
+        self.dashboard_title.setStyleSheet(STYLE_SECTION_BOLD + " padding: 20px;")
         self.dashboard_layout.addWidget(self.dashboard_title)
 
         # Container für die dynamischen Kalender-Kacheln
         self.tiles_container = QWidget()
-        self.tiles_layout = QVBoxLayout(self.tiles_container) # Vertikale Liste der Kalenderkarten
+        self.tiles_container.setStyleSheet(CALENDAR_TILE_BUTTON_STYLE % COLOR_CALENDAR_TILE_BG)
+        self.tiles_layout = QVBoxLayout(self.tiles_container)
         self.dashboard_layout.addWidget(self.tiles_container)
         self.dashboard_layout.addStretch() # Schiebt alles nach oben
 
@@ -221,11 +244,11 @@ class CalendarAppView(QWidget):
         table_layout = QVBoxLayout(self.table_page)
 
         self.current_cal_title = QLabel("Termine")
-        self.current_cal_title.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
+        self.current_cal_title.setStyleSheet(STYLE_SUBTITLE_BOLD + " padding: 10px;")
         table_layout.addWidget(self.current_cal_title)
 
         self.create_event_button = QPushButton("Neuen Termin erstellen")
-        self.create_event_button.setStyleSheet("margin: 0 10px 10px 10px; padding: 8px; font-weight: bold;")
+        self.create_event_button.setStyleSheet(CALENDAR_CREATE_EVENT_BUTTON_STYLE)
         table_layout.addWidget(self.create_event_button)
 
         self.table_view = QTableView()
@@ -255,28 +278,13 @@ class CalendarAppView(QWidget):
             tile_layout.setSpacing(10)
 
             tile_button = QPushButton(f"📅  {cal.calendar_name} ({len(cal.events)} Termine)")
-            tile_button.setStyleSheet(f"""
-                QPushButton {{
-                    text-align: left;
-                    padding: 15px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    color: #202124;
-                    background-color: #f1f3f4;
-                    border: none;
-                    border-left: 6px solid {cal.color_code};
-                    border-radius: 4px;
-                }}
-                QPushButton:hover {{
-                    background-color: #e8eaed;
-                }}
-            """)
+            tile_button.setStyleSheet(CALENDAR_TILE_BUTTON_STYLE % cal.color_code)
             tile_button.clicked.connect(lambda checked=False, i=index: on_tile_click_callback(i))
             tile_layout.addWidget(tile_button, 1)
 
             if on_create_callback is not None:
                 create_button = QPushButton("Neuen Termin")
-                create_button.setStyleSheet("padding: 10px; background-color: #1a73e8; color: white; border-radius: 4px;")
+                create_button.setStyleSheet(CALENDAR_NEW_EVENT_BUTTON_STYLE)
                 create_button.clicked.connect(lambda checked=False, cal_id=cal.calendar_id: on_create_callback(cal_id))
                 tile_layout.addWidget(create_button)
 

@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLabel, QLineEdit,
     QDialogButtonBox, QHBoxLayout, QPushButton
 )
+from standards_and_constants.view_constants import STYLE_DELETE_BUTTON, DIALOG_MIN_WIDTH
 from core.part_contacts.contact_model import Contact
 
 
@@ -104,7 +105,7 @@ class ContactEditDialog(QDialog):
     def __init__(self, contact: Contact, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Kontakt bearbeiten")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(DIALOG_MIN_WIDTH)
 
         self._contact = contact
         layout = QFormLayout(self)
@@ -123,7 +124,7 @@ class ContactEditDialog(QDialog):
 
         button_layout = QHBoxLayout()
         self.delete_button = QPushButton("Kontakt löschen")
-        self.delete_button.setStyleSheet("color: white; background-color: #c62828; padding: 6px 12px; border-radius: 4px;")
+        self.delete_button.setStyleSheet(STYLE_DELETE_BUTTON)
         self.delete_button.clicked.connect(self.on_delete_clicked)
         button_layout.addWidget(self.delete_button)
 
@@ -153,7 +154,7 @@ class ContactCreateDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Neuen Kontakt erstellen")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(DIALOG_MIN_WIDTH)
 
         layout = QFormLayout(self)
 

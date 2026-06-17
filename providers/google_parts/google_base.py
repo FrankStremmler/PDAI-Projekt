@@ -19,7 +19,7 @@
 
 # eigene Module importieren
 import os as os
-import providers.google_parts.google_constants as google_constants
+import standards_and_constants.google_constants as google_constants
 
 GOOGLE_SCOPES = google_constants.GOOGLE_SCOPES
 import os

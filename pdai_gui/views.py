@@ -11,16 +11,31 @@ from PySide6.QtWidgets import (
     QSizePolicy,
 )
 from PySide6.QtGui import QIcon
+from standards_and_constants.view_constants import (
+    SIDEBAR_ICON_SIZE,
+    SIDEBAR_EXPANDED_WIDTH,
+    SIDEBAR_COLLAPSED_WIDTH,
+    SIDEBAR_SPACING,
+    SIDEBAR_ANIMATION_DURATION,
+    WINDOW_TITLE,
+    WINDOW_INITIAL_WIDTH,
+    WINDOW_INITIAL_HEIGHT,
+    WINDOW_MIN_WIDTH,
+    WINDOW_MIN_HEIGHT,
+    WINDOW_RESIZE_THRESHOLD_RATIO,
+)
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PDAI — Startseite")
-        self.resize(1000, 600)
+        self.setWindowTitle(WINDOW_TITLE)
+        self.resize(WINDOW_INITIAL_WIDTH, WINDOW_INITIAL_HEIGHT)
+        self.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
-        self.expanded_width = 200
-        self.collapsed_width = 70
+        self._initial_width = WINDOW_INITIAL_WIDTH
+        self.expanded_width = SIDEBAR_EXPANDED_WIDTH
+        self.collapsed_width = SIDEBAR_COLLAPSED_WIDTH
         self.sidebar_collapsed = False
 
         central = QWidget()
@@ -28,16 +43,15 @@ class MainWindow(QMainWindow):
 
         # Sidebar wrapper with toggle icon
         self.side_panel = QWidget()
-        # self.side_panel.setFixedWidth(self.expanded_width)
         self.side_panel.setMaximumWidth(self.expanded_width)
         self.side_panel.setMinimumWidth(self.expanded_width)
         self.side_panel.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Expanding)
 
         self.sidebar = QListWidget()
-        self.sidebar.setIconSize(self.sidebar.iconSize())
+        self.sidebar.setIconSize(SIDEBAR_ICON_SIZE)
         self.sidebar.setSelectionMode(QListWidget.SingleSelection)
         self.sidebar.setUniformItemSizes(True)
-        self.sidebar.setSpacing(4)
+        self.sidebar.setSpacing(SIDEBAR_SPACING)
         self.sidebar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         side_layout = QVBoxLayout(self.side_panel)
@@ -46,6 +60,7 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(self.sidebar, 1)
 
         self.exit_item = None
+        self.settings_item = None
         self._last_app_row = None
 
         # Main area where sub-apps are shown
@@ -60,7 +75,15 @@ class MainWindow(QMainWindow):
 
         self._animation = QPropertyAnimation(self.side_panel, b"maximumWidth", self)
         self._animation.setEasingCurve(QEasingCurve.OutCubic)
-        self._animation.setDuration(250)
+        self._animation.setDuration(SIDEBAR_ANIMATION_DURATION)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        threshold = int(self._initial_width * WINDOW_RESIZE_THRESHOLD_RATIO)
+        if self.width() <= threshold and not self.sidebar_collapsed:
+            self.set_sidebar_collapsed(True, animate=True)
+        elif self.width() > threshold and self.sidebar_collapsed:
+            self.set_sidebar_collapsed(False, animate=True)
 
     def add_app(self, name: str, widget: QWidget, icon=None, entry_id: str | None = None):
         item = QListWidgetItem(name)
@@ -90,6 +113,16 @@ class MainWindow(QMainWindow):
         item.setSizeHint(QSize(1, height))
         self.sidebar.addItem(item)
 
+    def add_settings_item(self, name: str, icon: QIcon | None = None):
+        item = QListWidgetItem(name)
+        item.setData(Qt.UserRole, "settings")
+        item.setData(Qt.UserRole + 1, name)
+        if icon is not None:
+            item.setIcon(icon)
+        item.setToolTip(name)
+        self.sidebar.addItem(item)
+        self.settings_item = item
+
     def add_exit_item(self, name: str, icon: QIcon | None = None):
         item = QListWidgetItem(name)
         item.setData(Qt.UserRole, "exit")
@@ -104,7 +137,7 @@ class MainWindow(QMainWindow):
         if 0 <= index < self.sidebar.count():
             item = self.sidebar.item(index)
             role = item.data(Qt.UserRole)
-            if role in ("collapse", "exit", None):
+            if role in ("collapse", "settings", "exit", None):
                 return
             app_index = self._stack_index_for_row(index)
             if app_index is None:
@@ -118,7 +151,7 @@ class MainWindow(QMainWindow):
         for r in range(self.sidebar.count()):
             item = self.sidebar.item(r)
             role = item.data(Qt.UserRole)
-            if role not in ("collapse", "exit", None):
+            if role not in ("collapse", "settings", "exit", None):
                 app_rows.append(r)
         if row in app_rows:
             return app_rows.index(row)
@@ -127,6 +160,7 @@ class MainWindow(QMainWindow):
     def set_sidebar_collapsed(self, collapsed: bool, animate: bool = True):
         self.sidebar_collapsed = collapsed
         target_width = self.collapsed_width if collapsed else self.expanded_width
+        self.side_panel.setMinimumWidth(target_width)
         if animate:
             self._animation.stop()
             self._animation.setStartValue(self.side_panel.width())

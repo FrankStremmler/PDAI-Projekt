@@ -1,6 +1,6 @@
 
 import os
-from providers.google_parts import google_constants as google_constants
+from standards_and_constants import google_constants as google_constants
 from providers.google_parts import google_base as google_base
 from google_auth_oauthlib.flow import InstalledAppFlow
 import providers.google_parts.google_base as google_base

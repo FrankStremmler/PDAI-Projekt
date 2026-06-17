@@ -1,60 +1,131 @@
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QLabel,
-    QPushButton,
-    QHBoxLayout,
-    QTableWidget,
-    QTableWidgetItem,
-    QGroupBox,
-    QHeaderView,
-    QTextEdit,
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
 )
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
+
+from .hb_config_model import ConfigManager
+from standards_and_constants.hb_prompts_constants import PROVIDER_GEMINI, PROVIDER_OPENAI, MODEL_OPENAI, MODEL_GEMINI, RECEIPT_COLUMNS, STATEMENT_COLUMNS
+
+
+MODEL_NAMES = {
+    PROVIDER_GEMINI: MODEL_GEMINI,
+    PROVIDER_OPENAI: MODEL_OPENAI,
+}
 
 
 class HouseholdBudgetView(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Haushaltsbuch")
-        self.setMinimumSize(900, 600)
-
         root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(10, 10, 10, 10)
+        root_layout.setSpacing(10)
 
-        header = QLabel("Haushaltsbuch")
-        header.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 16px;")
-        root_layout.addWidget(header)
+        # Top Bar
+        top_bar = QHBoxLayout()
 
-        overview_box = QGroupBox("Übersicht")
-        overview_layout = QHBoxLayout(overview_box)
-        self.total_receipts_label = QLabel("Belege: 0")
-        self.total_amount_label = QLabel("Gesamtbetrag: 0,00 €")
-        self.latest_receipt_label = QLabel("Letzter Beleg: -")
-        overview_layout.addWidget(self.total_receipts_label)
-        overview_layout.addWidget(self.total_amount_label)
-        overview_layout.addWidget(self.latest_receipt_label)
-        root_layout.addWidget(overview_box)
+        self.btn_analyze = QPushButton(" Analysieren mit ...")
+        self.update_analyze_button()
+        self.btn_analyze.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        actions_box = QGroupBox("Aktionen")
-        actions_layout = QHBoxLayout(actions_box)
-        self.add_receipt_button = QPushButton("Beleg hinzufügen")
-        self.scan_receipt_button = QPushButton("Kassenbon analysieren")
-        actions_layout.addWidget(self.add_receipt_button)
-        actions_layout.addWidget(self.scan_receipt_button)
-        root_layout.addWidget(actions_box)
+        self.btn_analyze_statement = QPushButton(" Kontoauszug analysieren")
+        self.btn_analyze_statement.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self.receipt_table = QTableWidget(0, 4)
-        self.receipt_table.setHorizontalHeaderLabels(["Datum", "Händler", "Gesamt", "Status"])
-        self.receipt_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        root_layout.addWidget(self.receipt_table)
+        self.btn_switch_provider = QPushButton(" KI wechseln")
+        self.btn_switch_provider.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        details_box = QGroupBox("Beleg-Details / Analyse")
-        details_layout = QVBoxLayout(details_box)
-        self.receipt_details_text = QTextEdit()
-        self.receipt_details_text.setReadOnly(True)
-        self.receipt_details_text.setPlaceholderText(
-            "Hier erscheinen später ausgewählte Belegdaten und Analyseergebnisse."
-        )
-        details_layout.addWidget(self.receipt_details_text)
-        root_layout.addWidget(details_box)
+        top_bar.addWidget(self.btn_analyze)
+        top_bar.addWidget(self.btn_analyze_statement)
+        top_bar.addWidget(self.btn_switch_provider)
+        top_bar.addStretch()
 
-        root_layout.addStretch()
+        root_layout.addLayout(top_bar)
+
+        # Tabs
+        self.tabs = QTabWidget()
+
+        # Tab: Belege
+        self.receipt_tab = QWidget()
+        receipt_layout = QVBoxLayout(self.receipt_tab)
+        receipt_layout.setContentsMargins(0, 8, 0, 0)
+        self.receipt_table = QTableWidget(0, len(RECEIPT_COLUMNS))
+        self.receipt_table.setHorizontalHeaderLabels(RECEIPT_COLUMNS)
+        self.receipt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.receipt_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.receipt_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        receipt_layout.addWidget(self.receipt_table)
+
+        # Tab: Kontoauszüge
+        self.statement_tab = QWidget()
+        statement_layout = QVBoxLayout(self.statement_tab)
+        statement_layout.setContentsMargins(0, 8, 0, 0)
+        self.statement_table = QTableWidget(0, len(STATEMENT_COLUMNS))
+        self.statement_table.setHorizontalHeaderLabels(STATEMENT_COLUMNS)
+        self.statement_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.statement_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.statement_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        statement_layout.addWidget(self.statement_table)
+
+        self.tabs.addTab(self.receipt_tab, "Belege")
+        self.tabs.addTab(self.statement_tab, "Kontoauszüge")
+
+        root_layout.addWidget(self.tabs, 1)
+
+    def update_analyze_button(self):
+        provider = ConfigManager().config.ai_provider.lower()
+        model = MODEL_NAMES.get(provider, provider)
+        self.btn_analyze.setText(f" Analysieren mit {model}")
+
+    def set_loading_state(self, is_loading: bool):
+        if is_loading:
+            self.btn_analyze.setText("Analysiere mit KI...")
+            self.btn_analyze.setEnabled(False)
+            self.btn_analyze_statement.setText("Analysiere Kontoauszug...")
+            self.btn_analyze_statement.setEnabled(False)
+            self.btn_switch_provider.setEnabled(False)
+        else:
+            self.update_analyze_button()
+            self.btn_analyze.setEnabled(True)
+            self.btn_analyze_statement.setText(" Kontoauszug analysieren")
+            self.btn_analyze_statement.setEnabled(True)
+            self.btn_switch_provider.setEnabled(True)
+
+    def update_table_data(self, receipts_list):
+        self.receipt_table.setRowCount(0)
+        for row_idx, row_data in enumerate(receipts_list):
+            self.receipt_table.insertRow(row_idx)
+            for col_idx, value in enumerate(row_data):
+                if col_idx == 3:
+                    item_text = f"{value:.2f} €"
+                else:
+                    item_text = str(value)
+                item = QTableWidgetItem(item_text)
+                if col_idx in (0, 2, 4):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif col_idx == 3:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if col_idx == 4:
+                    if value == "booked":
+                        item.setForeground(Qt.GlobalColor.green)
+                    elif value == "pending":
+                        item.setForeground(Qt.GlobalColor.yellow)
+                    elif value == "suspicious":
+                        item.setForeground(Qt.GlobalColor.red)
+                self.receipt_table.setItem(row_idx, col_idx, item)
+
+    def update_statement_table(self, statements_list):
+        self.statement_table.setRowCount(0)
+        for row_idx, row_data in enumerate(statements_list):
+            self.statement_table.insertRow(row_idx)
+            for col_idx, value in enumerate(row_data):
+                if col_idx == 4:
+                    item_text = f"{value:.2f} €"
+                else:
+                    item_text = str(value)
+                item = QTableWidgetItem(item_text)
+                if col_idx in (0, 3):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif col_idx == 4:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.statement_table.setItem(row_idx, col_idx, item)

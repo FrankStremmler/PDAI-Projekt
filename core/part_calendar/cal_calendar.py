@@ -11,7 +11,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from providers.google_parts.google_base import create_service
-from providers.google_parts.google_constants import GOOGLE_SCOPES, CONFIG_PATH
+from standards_and_constants.google_constants import GOOGLE_SCOPES, CONFIG_PATH
 
 SCOPES = GOOGLE_SCOPES
 # Pfade sauber definieren (Nutzt den Unterordner .secret)

@@ -1,131 +1,146 @@
-# hb_file_input_controller.py
 import os
+import base64
+import mimetypes
+from dotenv import load_dotenv
 from typing import Optional
-from openai import OpenAI
+from PySide6.QtCore import QObject, Signal
 
-# Import der MVC-Konstanten und Text-Prompts
-from hb_prompts_constants import (
-    INPUT_DIR,
-    ALLOWED_EXTENSIONS,
-    OPENAI_MODEL,
-    PROMPT_BANK_STATEMENT,
-    PROMPT_RECEIPT
+from ..pdf_utils import pdf_to_jpeg_bytes
+from .hb_base import NormalizedReceipt, NormalizedBankStatement
+from .hb_config_model import ConfigManager
+from standards_and_constants.hb_prompts_constants import (
+    PROVIDER_OPENAI, PROVIDER_GEMINI, MODEL_OPENAI, MODEL_GEMINI,
+    PROMPT_RECEIPT, PROMPT_BANK_STATEMENT, MIME_PDF,
 )
 
-# Import der zentralen Pydantic-Validierungsmodelle aus der Basis-Datei
-from hb_base import BankStatementSchema, ReceiptSchema
-
-# Import des vorhandenen Hilfsmoduls für Dateioperationen und Encodings
-import providers.openai_functions as openai_utils
+load_dotenv()
 
 
-class FileInputController:
-    """
-    MVC-Controller für die Erfassung von Belegen und Bankauszügen.
-    Überwacht Eingabeordner und steuert die strukturierte Extraktion via OpenAI.
-    """
+class AIPlatformWrapper(QObject):
+    status_changed = Signal(str)
+    analysis_completed = Signal(object)
+    analysis_failed = Signal(str)
+
     def __init__(self):
-        # Initialisierung des OpenAI-Clients.
-        # Erwartet den API-Key automatisch in os.environ["OPENAI_API_KEY"]
-        self.client = OpenAI()
+        super().__init__()
+        self.config_manager = ConfigManager()
+        self.provider = self.config_manager.config.ai_provider.lower()
 
-        # Sicherstellen, dass das Eingangsverzeichnis existiert
-        if not os.path.exists(INPUT_DIR):
-            os.makedirs(INPUT_DIR)
-
-    def scan_input_folder(self) -> list[str]:
-        """
-        Durchsucht das Eingangsverzeichnis nach neuen Dokumenten,
-        deren Dateiendung in den erlaubten Typen definiert ist.
-
-        Returns:
-            list[str]: Eine Liste mit den relativen Pfaden zu den gefundenen Dateien.
-        """
-        found_files = []
-        for file in os.listdir(INPUT_DIR):
-            ext = os.path.splitext(file).lower()
-            if ext in ALLOWED_EXTENSIONS:
-                found_files.append(os.path.join(INPUT_DIR, file))
-        return found_files
-
-    def analyze_document(self, file_path: str, doc_type: str) -> Optional[dict]:
-        """
-        Analysiert ein Dokument (PDF oder Bild) mithilfe der OpenAI-API.
-        Zwingt gpt-4.1-mini zur Einhaltung des Pydantic-Schemas.
-
-        Args:
-            file_path (str): Der Pfad zur zu analysierenden Datei.
-            doc_type (str): Der Typ des Dokuments ('bank' oder 'receipt').
-
-        Returns:
-            Optional[dict]: Das validierte Ergebnis als Python-Dictionary oder None im Fehlerfall.
-        """
+    def analyze_receipt(self, file_path: str, mime_type: str) -> Optional[NormalizedReceipt]:
         if not os.path.exists(file_path):
-            print(f"[Input-Controller] Fehler: Datei existiert nicht: {file_path}")
-            return None
+            raise FileNotFoundError(f"Datei nicht gefunden: {file_path}")
 
-        print(f"[Input-Controller] Starte Analyse für '{os.path.basename(file_path)}' ({doc_type}) via {OPENAI_MODEL}...")
+        if self.provider == PROVIDER_OPENAI:
+            return self._analyze_with_openai(file_path, mime_type, PROMPT_RECEIPT, NormalizedReceipt)
+        return self._analyze_with_gemini(file_path, mime_type, PROMPT_RECEIPT, NormalizedReceipt)
 
-        # Nutzen der vorhandenen Funktion aus providers/openai_functions.py
-        # Verarbeitet PDFs direkt oder encodiert Bilder bei Bedarf zu Base64
-        file_data = openai_utils.upload_file_to_ai(file_path)
+    def analyze_bank_statement(self, file_path: str, mime_type: str) -> Optional[NormalizedBankStatement]:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Datei nicht gefunden: {file_path}")
 
-        # Zuweisung von Text-Prompts und Ziel-Schema basierend auf dem Dokumententyp
-        if doc_type == "bank":
-            system_prompt = PROMPT_BANK_STATEMENT
-            target_schema = BankStatementSchema
-        elif doc_type == "receipt":
-            system_prompt = PROMPT_RECEIPT
-            target_schema = ReceiptSchema
+        if self.provider == PROVIDER_OPENAI:
+            return self._analyze_with_openai(file_path, mime_type, PROMPT_BANK_STATEMENT, NormalizedBankStatement)
+        return self._analyze_with_gemini(file_path, mime_type, PROMPT_BANK_STATEMENT, NormalizedBankStatement)
+
+    def _build_user_content(self, file_path: str, mime_type: str, prompt: str):
+        is_pdf = mime_type == MIME_PDF
+        if is_pdf:
+            self.status_changed.emit("Konvertiere PDF in Bilder...")
+            page_images = pdf_to_jpeg_bytes(file_path)
+            content: list[dict] = [{"type": "text", "text": prompt}]
+            for img_bytes in page_images:
+                b64 = base64.b64encode(img_bytes).decode("utf-8")
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+                })
+            print(f"[AI] PDF konvertiert: {len(page_images)} Seite(n) als JPEG")
+            return content, None, None
         else:
-            raise ValueError("[Input-Controller] Ungültiger doc_type. Erlaubt sind nur 'bank' oder 'receipt'.")
+            mime, _ = mimetypes.guess_type(file_path)
+            mime = mime or mime_type
+            with open(file_path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("utf-8")
+            return [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
+            ], None, None
+
+    def _parse_openai_response(self, response, target_model):
+        parsed = response.choices[0].message.parsed
+        if parsed:
+            return parsed
+        raw = response.choices[0].message.content
+        if raw:
+            return target_model.model_validate_json(raw)
+        raise ValueError("Keine Antwort von der KI erhalten.")
+
+    def _analyze_with_openai(self, file_path, mime_type, prompt, target_model):
+        from openai import OpenAI
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY in .env nicht gesetzt")
+
+        client = OpenAI(api_key=api_key)
+        user_content, file_id, upload_client = self._build_user_content(file_path, mime_type, prompt)
 
         try:
-            # API-Aufruf über das strukturierte Beta-Parsing-Modul von OpenAI
-            response = self.client.beta.chat.completions.parse(
-                model=OPENAI_MODEL,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": "Extrahiere die strukturierten Daten aus diesem Dokument für das Haushaltsbuch."},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    # Dynamische Übergabe des Mime-Types und des Datei-Inhalts aus Ihrer providers-Funktion
-                                    "url": f"data:{file_data['file_type']};base64,{file_data['file_content']}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                response_format=target_schema,  # Erzwingt die exakte Strukturierung auf Token-Ebene
-                temperature=0.1                 # Niedriger Wert für höchste Datentreue und Faktenstabilität
+            self.status_changed.emit(f"KI-Analyse mit {MODEL_OPENAI}...")
+            response = client.beta.chat.completions.parse(
+                model=MODEL_OPENAI,
+                messages=[{"role": "user", "content": user_content}],
+                response_format=target_model,
+                temperature=0.1,
             )
 
-            # Das fertig validierte Pydantic-Objekt aus der Antwort ziehen
-            parsed_result = response.choices.message.parsed
-
-            if parsed_result:
-                # Konvertiert das Pydantic-Modell in ein reines Python-Dictionary für den CRUD-Controller
-                return parsed_result.model_dump()
-
-            print("[Input-Controller] Fehler: KI-Antwort konnte nicht in das Schema geparset werden.")
-            return None
+            result = self._parse_openai_response(response, target_model)
+            print(f"[AI-Output]: {result.model_dump_json()}")
+            self.status_changed.emit("Analyse erfolgreich abgeschlossen.")
+            self.analysis_completed.emit(result)
+            return result
 
         except Exception as e:
-            print(f"[Input-Controller] Kritischer Fehler bei der OpenAI-API-Verarbeitung: {e}")
-            return None
+            error_msg = f"OpenAI-Fehler: {e}"
+            print(f"[AI] {error_msg}")
+            self.analysis_failed.emit(error_msg)
+            raise e
 
+        finally:
+            if file_id and upload_client:
+                try:
+                    upload_client.files.delete(file_id)
+                    print(f"[AI] Server-Cleanup: {file_id}")
+                except Exception as e:
+                    print(f"[AI] Cleanup-Warnung: {e}")
 
-# Modultest (wird nur ausgeführt, wenn die Datei direkt gestartet wird)
-if __name__ == "__main__":
-    # Testen Sie hier die Erkennung, falls Testdateien im Ordner liegen
-    controller = FileInputController()
-    dateien = controller.scan_input_folder()
-    print(f"[Test] Gefundene Dateien im Eingangsordner: {dateien}")
+    def _analyze_with_gemini(self, file_path, mime_type, prompt, target_model):
+        from providers.google_parts.gemini import get_client, generate_structured
 
+        client = get_client()
+        uploaded_file = None
+
+        try:
+            self.status_changed.emit(f"KI-Analyse mit {MODEL_GEMINI}...")
+            result_text, uploaded_file = generate_structured(
+                client, MODEL_GEMINI, prompt, file_path, mime_type, target_model
+            )
+
+            result = target_model.model_validate_json(result_text)
+            print(f"[AI-Output]: {result.model_dump_json()}")
+            self.status_changed.emit("Analyse erfolgreich abgeschlossen.")
+            self.analysis_completed.emit(result)
+            return result
+
+        except Exception as e:
+            error_msg = f"Gemini-Fehler: {e}"
+            print(f"[AI] {error_msg}")
+            self.analysis_failed.emit(error_msg)
+            raise e
+
+        finally:
+            if uploaded_file is not None:
+                try:
+                    client.files.delete(name=uploaded_file.name)
+                    print(f"[Gemini] Cleanup: {uploaded_file.name}")
+                except Exception:
+                    pass

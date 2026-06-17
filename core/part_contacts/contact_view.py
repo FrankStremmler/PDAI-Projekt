@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QLineEdit,
 )
+from standards_and_constants.view_constants import SEARCH_PLACEHOLDER
 
 
 
@@ -33,7 +34,7 @@ class ContactAppView(QWidget):
         content_layout = QVBoxLayout()
         self.current_group_title = QLabel("")
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Suche (Name, E-Mail, Telefon, Adresse)")
+        self.search_input.setPlaceholderText(SEARCH_PLACEHOLDER)
 
         self.sort_button = QPushButton("A-Z")
         self.sort_button.setCheckable(True)

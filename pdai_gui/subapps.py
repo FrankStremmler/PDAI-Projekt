@@ -1,4 +1,11 @@
+from PySide6.QtCore import Qt, QTimer, QDateTime
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox
+from standards_and_constants.view_constants import (
+    STYLE_TITLE_BOLD,
+    STYLE_DATETIME_DISPLAY,
+    STYLE_GROUPBOX,
+    DATETIME_DISPLAY_FORMAT,
+)
 
 from core.part_calendar.cal_gui import CalendarAppView, DynamicCalendarTableModel
 from core.part_calendar.cal_main import CalendarController
@@ -14,6 +21,7 @@ from core.part_cloud.drive_controller import DriveController
 
 
 from core.part_household_budget import HouseholdBudgetView, HouseholdBudgetController
+from providers.google_parts import google_base
 
 
 class HomeWidget(QWidget):
@@ -22,22 +30,26 @@ class HomeWidget(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         title = QLabel("Willkommen bei PDAI")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
-        text = QLabel(
-            "Dies ist die Startseite. Wähle links eine Sub-App aus, um die Funktionalität zu sehen."
-        )
-        text.setWordWrap(True)
+        title.setStyleSheet(STYLE_TITLE_BOLD)
         layout.addWidget(title)
-        layout.addWidget(text)
+
+        self.datetime_label = QLabel(QDateTime.currentDateTime().toString(DATETIME_DISPLAY_FORMAT))
+        self.datetime_label.setStyleSheet(STYLE_DATETIME_DISPLAY)
+        self.datetime_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.datetime_label)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self._update_datetime)
+        self.timer.start(1000)
 
         boxes = QHBoxLayout()
 
         today_box = QGroupBox("Termine heute")
-        today_box.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; }")
+        today_box.setStyleSheet(STYLE_GROUPBOX)
         today_layout = QVBoxLayout(today_box)
 
         upcoming_box = QGroupBox("Nächste Termine")
-        upcoming_box.setStyleSheet("QGroupBox { font-weight: bold; margin-top: 10px; }")
+        upcoming_box.setStyleSheet(STYLE_GROUPBOX)
         upcoming_layout = QVBoxLayout(upcoming_box)
 
         try:
@@ -82,6 +94,9 @@ class HomeWidget(QWidget):
         boxes.addWidget(upcoming_box)
         layout.addLayout(boxes)
 
+    def _update_datetime(self):
+        self.datetime_label.setText(QDateTime.currentDateTime().toString(DATETIME_DISPLAY_FORMAT))
+
 
 class CalendarWidget(QWidget):
 
@@ -116,7 +131,7 @@ class NotesWidget(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         title = QLabel("Notizen")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet(STYLE_TITLE_BOLD)
         text = QLabel(
             "Hier können später Notizen erstellt und durchsucht werden."
         )
@@ -160,7 +175,7 @@ class BudgetWidget(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         title = QLabel("Budgetverwaltung")
-        title.setStyleSheet("font-size: 20px; font-weight: bold;")
+        title.setStyleSheet(STYLE_TITLE_BOLD)
         text = QLabel(
             "Hier können später Budget-Analysen, Ausgaben und Haushaltstracker eingebunden werden."
         )
@@ -174,8 +189,29 @@ class HouseholdBookWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.household_view = HouseholdBudgetView()
-        self.household_controller = HouseholdBudgetController(self.household_view)
+        self._was_visible = False
+
+        drive_service = None
+        try:
+            drive_service = google_base.create_service("drive")
+            print("[HouseholdBook] Google Drive-Service initialisiert")
+        except Exception as e:
+            print(f"[HouseholdBook] Kein Drive-Zugriff ({e}), verwende lokale DB")
+
+        self.household_controller = HouseholdBudgetController(
+            self.household_view, drive_service=drive_service
+        )
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.household_view)
+
+    def showEvent(self, event):
+        self._was_visible = True
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        if self._was_visible and self.household_controller:
+            print("[HouseholdBook] SubApp verlassen, lade zur Drive hoch...")
+            self.household_controller.save_to_drive()
+        super().hideEvent(event)
 

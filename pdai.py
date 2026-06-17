@@ -1,26 +1,20 @@
-'''
-Main entry point for the PDAI-Project.
-Integrating AI and a Household_Budget to a Personal Digital Assistant in a single application.
-The Personal Digital Assistant (PDAI) is a software application designed to assist users in managing their daily tasks, schedules, and information. It integrates artificial intelligence (AI) capabilities to provide personalized assistance and enhance user experience. The PDAI can perform various functions such as setting reminders, answering questions, providing recommendations, and managing household budgets.
+"""Projekt-Einstieg.
 
-The AI is used to analyze Receipts and can also provide insights and Analysis of the Budget.
-'''
-import os
+Dieses Modul ist die Entry-Point-Datei und startet die PySide6-GUI.
+"""
+
+from __future__ import annotations
+
 import sys
-from dotenv import load_dotenv
-from openai import api_key
-
-load_dotenv()
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
 
 
-def main():
-    from pdai_gui import run_app
-    return run_app()
+def main() -> int:
+    # Start der GUI über die dafür vorgesehene Einstiegspunkte-Datei.
+    from pdai_gui.main import run_app
+
+    return int(run_app())
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

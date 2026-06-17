@@ -1,0 +1,10 @@
+{
+    "ai_provider": "openai",
+    "current_theme": "dark",
+    "theme": {
+        "background": "#1e1e1e",
+        "surface": "#2d2d2d",
+        "text": "#ffffff",
+        "accent": "#2563eb"
+    }
+}
