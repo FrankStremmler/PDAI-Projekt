@@ -23,6 +23,7 @@ class DatabaseController:
         self._drive_folder_id = None
         self._drive_file_id = None
         self._drive_db_exists = False
+        self._dirty = False
 
     def _ensure_drive_folder(self):
         if self._drive_folder_id:
@@ -153,6 +154,7 @@ class DatabaseController:
             else:
                 session.add(DbSync(id=1, last_update=datetime.utcnow()))
             session.commit()
+        self._dirty = True
 
     def prepare_working_directory(self):
         if self.use_drive:
@@ -163,21 +165,21 @@ class DatabaseController:
                 if exists_on_drive:
                     print("[DB] Lade DB von Google Drive in Temp-Verzeichnis...")
                     self._download_from_drive()
+                    drive_ts = self._read_last_update(self.working_db_path)
+                    local_ts = self._read_last_update(self.master_db_path)
 
-                drive_ts = self._read_last_update(self.working_db_path) if exists_on_drive else None
-                local_ts = self._read_last_update(self.master_db_path)
-
-                if drive_ts is not None and (local_ts is None or drive_ts > local_ts):
-                    print("[DB] Drive-DB ist aktueller, überschreibe lokale Master-DB")
-                    shutil.copy2(self.working_db_path, self.master_db_path)
-                elif local_ts is not None and (drive_ts is None or local_ts >= drive_ts):
-                    print("[DB] Lokale DB ist aktueller, kopiere in Temp")
-                    if os.path.exists(self.working_db_path):
-                        os.remove(self.working_db_path)
+                    if local_ts is None or (drive_ts is not None and drive_ts > local_ts):
+                        print("[DB] Drive-DB ist aktueller, überschreibe lokale Master-DB")
+                        shutil.copy2(self.working_db_path, self.master_db_path)
+                    elif local_ts is not None and (drive_ts is None or local_ts > drive_ts):
+                        print("[DB] Lokale DB ist aktueller, kopiere in Temp")
+                        if os.path.exists(self.working_db_path):
+                            os.remove(self.working_db_path)
+                        shutil.copy2(self.master_db_path, self.working_db_path)
+                elif os.path.exists(self.master_db_path):
+                    print("[DB] Lokale DB in Temp kopieren")
                     shutil.copy2(self.master_db_path, self.working_db_path)
                 else:
-                    if os.path.exists(self.working_db_path):
-                        os.remove(self.working_db_path)
                     print("[DB] Keine DB vorhanden. Lege neue an.")
             except Exception as e:
                 print(f"[DB] Drive-Fehler, verwende lokale DB: {e}")
@@ -303,7 +305,25 @@ class DatabaseController:
         if not self.use_drive:
             return
         self.save_and_sync_back()
-        self._upload_to_drive()
+
+        if self._dirty:
+            print("[DB] Änderungen vorhanden, lade zu Drive hoch")
+            self._upload_to_drive()
+        else:
+            drive_ts = self._read_last_update(self.working_db_path)
+            local_ts = self._read_last_update(self.master_db_path)
+
+            if local_ts is not None and (drive_ts is None or local_ts > drive_ts):
+                print("[DB] Lokale DB neuer als Drive, lade hoch")
+                self._upload_to_drive()
+            elif drive_ts is not None and (local_ts is None or drive_ts > local_ts):
+                print("[DB] Drive neuer als lokale DB, lade herunter")
+                self._download_from_drive()
+                shutil.copy2(self.working_db_path, self.master_db_path)
+            else:
+                print("[DB] Keine Änderungen, kein Upload nötig")
+
+        self._dirty = False
 
     def close_session(self):
         if self._session:

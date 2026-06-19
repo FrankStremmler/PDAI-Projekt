@@ -9,7 +9,7 @@ from pdai_gui.views import MainWindow
 from pdai_gui.controllers import MainController
 from pdai_gui.subapps import (
     HomeWidget, CalendarWidget, ContactsWidget,
-    CloudStorageWidget, NotesWidget, HouseholdBookWidget, BudgetWidget,
+    CloudStorageWidget, NotesWidget, HouseholdBookWidget,
 )
 from standards_and_constants.hb_prompts_constants import TEMP_DB_PATH
 
@@ -33,7 +33,6 @@ def run_app() -> int:
     model.register("cloud", "Cloud", CloudStorageWidget)
     model.register("notes", "Notizen", NotesWidget)
     model.register("household", "Haushaltsbuch", HouseholdBookWidget)
-    model.register("budget", "Budget", BudgetWidget)
 
     view = MainWindow()
     controller = MainController(model, view)

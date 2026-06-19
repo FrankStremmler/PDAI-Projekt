@@ -47,6 +47,8 @@ class HouseholdBudgetController:
         self.view.btn_analyze.clicked.connect(self.start_receipt_analysis)
         self.view.btn_analyze_statement.clicked.connect(self.start_bank_statement_analysis)
         self.view.btn_switch_provider.clicked.connect(self.toggle_ai_provider)
+        self.view.receipt_delete_requested.connect(self._delete_receipt)
+        self.view.statement_delete_requested.connect(self._delete_bank_statement)
         self.refresh_tables()
 
     def toggle_ai_provider(self):
@@ -59,6 +61,32 @@ class HouseholdBudgetController:
     def save_to_drive(self):
         self.db.save_to_drive()
         self.db.dispose()
+
+    def _delete_receipt(self, receipt_id: int):
+        reply = QMessageBox.question(
+            self.view, "Löschen bestätigen",
+            f"Beleg ID={receipt_id} wirklich löschen?\nAlle zugehörigen Artikel werden ebenfalls gelöscht.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.crud.delete_receipt(receipt_id):
+                self.refresh_tables()
+            else:
+                self._show_error("Fehler beim Löschen des Belegs.")
+
+    def _delete_bank_statement(self, statement_id: int):
+        reply = QMessageBox.question(
+            self.view, "Löschen bestätigen",
+            f"Kontoauszug ID={statement_id} wirklich löschen?\nAlle zugehörigen Buchungspositionen werden ebenfalls gelöscht.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.crud.delete_bank_statement(statement_id):
+                self.refresh_tables()
+            else:
+                self._show_error("Fehler beim Löschen des Kontoauszugs.")
 
     def refresh_tables(self):
         self.view.update_table_data(self.crud.get_all_receipts())

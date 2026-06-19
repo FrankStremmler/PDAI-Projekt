@@ -322,7 +322,49 @@ class CrudController:
             return regulars
 
     # ==========================================
-    # CREATE / UPDATE / DELETE
+    # DELETE
+    # ==========================================
+
+    def delete_receipt(self, receipt_id: int) -> bool:
+        with self._get_session() as session:
+            try:
+                receipt = session.get(Receipt, receipt_id)
+                if not receipt:
+                    return False
+                for pos in session.scalars(
+                    select(StatementPosition).where(StatementPosition.matched_receipt_id == receipt_id)
+                ).all():
+                    pos.matched_receipt_id = None
+                session.delete(receipt)
+                session.commit()
+                print(f"[CRUD] Beleg ID={receipt_id} gelöscht")
+                self.db_controller.update_last_update()
+                self.db_controller.save_and_sync_back()
+                return True
+            except Exception as e:
+                session.rollback()
+                print(f"[CRUD] Fehler beim Löschen des Belegs: {e}")
+                return False
+
+    def delete_bank_statement(self, statement_id: int) -> bool:
+        with self._get_session() as session:
+            try:
+                statement = session.get(BankStatement, statement_id)
+                if not statement:
+                    return False
+                session.delete(statement)
+                session.commit()
+                print(f"[CRUD] Kontoauszug ID={statement_id} gelöscht")
+                self.db_controller.update_last_update()
+                self.db_controller.save_and_sync_back()
+                return True
+            except Exception as e:
+                session.rollback()
+                print(f"[CRUD] Fehler beim Löschen des Kontoauszugs: {e}")
+                return False
+
+    # ==========================================
+    # CREATE / UPDATE
     # ==========================================
 
     def create_category(self, name: str) -> bool:

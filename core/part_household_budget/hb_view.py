@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
+    QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget, QMenu,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
 
 from .hb_config_model import ConfigManager
@@ -16,6 +16,9 @@ MODEL_NAMES = {
 
 
 class HouseholdBudgetView(QWidget):
+    receipt_delete_requested = Signal(int)
+    statement_delete_requested = Signal(int)
+
     def __init__(self):
         super().__init__()
         root_layout = QVBoxLayout(self)
@@ -54,6 +57,8 @@ class HouseholdBudgetView(QWidget):
         self.receipt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.receipt_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.receipt_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.receipt_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.receipt_table.customContextMenuRequested.connect(self._show_receipt_context_menu)
         receipt_layout.addWidget(self.receipt_table)
 
         # Tab: Kontoauszüge
@@ -65,6 +70,8 @@ class HouseholdBudgetView(QWidget):
         self.statement_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.statement_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.statement_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.statement_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.statement_table.customContextMenuRequested.connect(self._show_statement_context_menu)
         statement_layout.addWidget(self.statement_table)
 
         self.tabs.addTab(self.receipt_tab, "Belege")
@@ -129,3 +136,25 @@ class HouseholdBudgetView(QWidget):
                 elif col_idx == 4:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.statement_table.setItem(row_idx, col_idx, item)
+
+    def _show_receipt_context_menu(self, pos):
+        row = self.receipt_table.rowAt(pos.y())
+        if row < 0:
+            return
+        receipt_id = int(self.receipt_table.item(row, 0).text())
+        menu = QMenu(self)
+        delete_action = menu.addAction("Löschen")
+        action = menu.exec(self.receipt_table.viewport().mapToGlobal(pos))
+        if action == delete_action:
+            self.receipt_delete_requested.emit(receipt_id)
+
+    def _show_statement_context_menu(self, pos):
+        row = self.statement_table.rowAt(pos.y())
+        if row < 0:
+            return
+        statement_id = int(self.statement_table.item(row, 0).text())
+        menu = QMenu(self)
+        delete_action = menu.addAction("Löschen")
+        action = menu.exec(self.statement_table.viewport().mapToGlobal(pos))
+        if action == delete_action:
+            self.statement_delete_requested.emit(statement_id)

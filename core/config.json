@@ -1,4 +1,21 @@
 {
+    "view": {
+        "font_family": "Segoe UI",
+        "font": {
+            "title": 16,
+            "subtitle": 13,
+            "section": 14,
+            "body": 10,
+            "small": 8,
+            "datetime": 38
+        },
+        "color": {
+            "sidebar_bg": "#202124",
+            "sidebar_text": "white",
+            "accent": "#1a73e8",
+            "delete_bg": "#c62828"
+        }
+    },
     "ai_provider": "openai",
     "current_theme": "dark",
     "theme": {

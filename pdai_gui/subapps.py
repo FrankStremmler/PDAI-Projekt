@@ -170,20 +170,6 @@ class DriveContactsWidget(QWidget):
 
 
 
-class BudgetWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        title = QLabel("Budgetverwaltung")
-        title.setStyleSheet(STYLE_TITLE_BOLD)
-        text = QLabel(
-            "Hier können später Budget-Analysen, Ausgaben und Haushaltstracker eingebunden werden."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
-
-
 class HouseholdBookWidget(QWidget):
 
     def __init__(self):
