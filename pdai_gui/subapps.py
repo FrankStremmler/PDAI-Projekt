@@ -21,6 +21,8 @@ from core.part_cloud.drive_controller import DriveController
 
 
 from core.part_household_budget import HouseholdBudgetView, HouseholdBudgetController
+from core.part_notes.notes_gui import NotesListView
+from core.part_notes.notes_controller import NotesController
 from providers.google_parts import google_base
 
 
@@ -130,14 +132,12 @@ class NotesWidget(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout(self)
-        title = QLabel("Notizen")
-        title.setStyleSheet(STYLE_TITLE_BOLD)
-        text = QLabel(
-            "Hier können später Notizen erstellt und durchsucht werden."
-        )
-        text.setWordWrap(True)
-        layout.addWidget(title)
-        layout.addWidget(text)
+
+        self.view = NotesListView()
+        self.controller = NotesController(self.view)
+        self.view.attach_controller(self.controller)
+
+        layout.addWidget(self.view)
 
 
 class CloudStorageWidget(QWidget):
