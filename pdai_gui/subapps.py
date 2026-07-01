@@ -139,6 +139,10 @@ class NotesWidget(QWidget):
 
         layout.addWidget(self.view)
 
+    def hideEvent(self, event):
+        self.view.editor.try_save()
+        super().hideEvent(event)
+
 
 class CloudStorageWidget(QWidget):
 

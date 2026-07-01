@@ -6,6 +6,7 @@ from typing import List, Optional
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QAbstractItemDelegate,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -60,17 +61,17 @@ def _short_preview(note: Note, max_len: int = 80) -> str:
 
 class NoteCard(QFrame):
     clicked = Signal(object)
+    delete_clicked = Signal(object)
 
     def __init__(self, note: Note, parent=None):
         super().__init__(parent)
         self._note = note
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setStyleSheet(self._style_card())
         self.setFixedHeight(90)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setContentsMargins(12, 8, 8, 8)
 
         self.icon_label = QLabel(TYPE_ICONS.get(note.note_type, "📄"))
         self.icon_label.setFont(QFont("Segoe UI", 22))
@@ -114,27 +115,31 @@ class NoteCard(QFrame):
 
         layout.addLayout(meta_layout)
 
+        self.delete_btn = QPushButton("✕")
+        self.delete_btn.setFixedSize(22, 22)
+        self.delete_btn.setCursor(Qt.CursorShape.ArrowCursor)
+        self.delete_btn.setStyleSheet(
+            "QPushButton {"
+            "  background: #5a1a1a; color: #ff6b6b; border: none;"
+            "  border-radius: 11px; font-size: 12px; font-weight: bold;"
+            "}"
+            "QPushButton:hover {"
+            "  background: #7a2222; color: #ff9999;"
+            "}"
+        )
+        self.delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self._note))
+        layout.addWidget(self.delete_btn)
+
     def mousePressEvent(self, event):
         self.clicked.emit(self._note)
         super().mousePressEvent(event)
-
-    @staticmethod
-    def _style_card() -> str:
-        return (
-            "QFrame {"
-            "  background: #2d2d2d; border: 1px solid #444;"
-            "  border-radius: 6px; margin: 2px 0;"
-            "}"
-            "QFrame:hover {"
-            "  background: #3a3a3a; border: 1px solid #2563eb;"
-            "}"
-        )
 
 
 # ── Note list view (card grid) ──
 
 class NoteListView(QWidget):
     note_selected = Signal(object)
+    delete_requested = Signal(object)
 
     def __init__(self):
         super().__init__()
@@ -178,11 +183,15 @@ class NoteListView(QWidget):
         for note in self._notes:
             card = NoteCard(note)
             card.clicked.connect(self._on_card_clicked)
+            card.delete_clicked.connect(self._on_card_delete_clicked)
             self.card_layout.insertWidget(self.card_layout.count() - 1, card)
             self._card_widgets.append(card)
 
     def _on_card_clicked(self, note: Note):
         self.note_selected.emit(note)
+
+    def _on_card_delete_clicked(self, note: Note):
+        self.delete_requested.emit(note)
 
 
 # ── Note editor (detail view) ──
@@ -301,8 +310,10 @@ class NoteEditor(QWidget):
         self.text_edit.textChanged.connect(self._mark_unsaved)
         self.cl_open_list.itemChanged.connect(self._on_cl_item_changed)
         self.cl_open_list.itemDoubleClicked.connect(self._on_cl_item_double_clicked)
+        self.cl_open_list.itemDelegate().closeEditor.connect(self._on_cl_editor_closed)
         self.cl_done_list.itemChanged.connect(self._on_cl_item_changed)
         self.cl_done_list.itemDoubleClicked.connect(self._on_cl_item_double_clicked)
+        self.cl_done_list.itemDelegate().closeEditor.connect(self._on_cl_editor_closed)
         self.cl_add_btn.clicked.connect(self._on_cl_add)
         self.cl_remove_btn.clicked.connect(self._on_cl_remove)
         self.image_desc_edit.textChanged.connect(self._mark_unsaved)
@@ -420,17 +431,54 @@ class NoteEditor(QWidget):
 
     def _on_cl_item_changed(self, item: QListWidgetItem):
         self._apply_cl_item_style(item)
+        source = item.listWidget()
+        if source is None:
+            return
 
-        source = self.cl_open_list if item.listWidget() is self.cl_open_list else self.cl_done_list
         is_now_checked = item.checkState() == Qt.CheckState.Checked
         belongs_to_open = source is self.cl_open_list
 
         if belongs_to_open and is_now_checked:
             self._move_item(item, source, self.cl_done_list)
+            self._mark_unsaved()
         elif not belongs_to_open and not is_now_checked:
             self._move_item(item, source, self.cl_open_list)
+            self._mark_unsaved()
 
-        self._mark_unsaved()
+    def _on_cl_editor_closed(self, editor, hint):
+        line_text = editor.text().strip()
+
+        for lst in (self.cl_open_list, self.cl_done_list):
+            if editor.parent() is lst.viewport() or editor.parent() is lst:
+                current = lst.currentItem()
+                if current is None:
+                    return
+
+                if not line_text:
+                    lst.blockSignals(True)
+                    lst.takeItem(lst.row(current))
+                    lst.blockSignals(False)
+                    self._mark_unsaved()
+                    return
+
+                if hint in (
+                    QAbstractItemDelegate.EndEditHint.SubmitModelCache,
+                    QAbstractItemDelegate.EndEditHint.EditNextItem,
+                ):
+                    idx = lst.row(current)
+                    new_item = QListWidgetItem("")
+                    new_item.setFlags(
+                        new_item.flags()
+                        | Qt.ItemFlag.ItemIsUserCheckable
+                        | Qt.ItemFlag.ItemIsEditable
+                    )
+                    new_item.setCheckState(Qt.CheckState.Unchecked)
+                    lst.blockSignals(True)
+                    lst.insertItem(idx + 1, new_item)
+                    lst.blockSignals(False)
+                    lst.editItem(new_item)
+                    self._mark_unsaved()
+                break
 
     def _move_item(self, item: QListWidgetItem, source: QListWidget, target: QListWidget):
         row = source.row(item)
@@ -457,6 +505,15 @@ class NoteEditor(QWidget):
                 lst.takeItem(row)
                 self._mark_unsaved()
                 return
+
+    def try_save(self) -> bool:
+        if self._note is None or not self._has_unsaved:
+            return False
+        note = self.get_note()
+        if note:
+            self.save_requested.emit(note)
+            return True
+        return False
 
     def _on_save(self):
         self.save_requested.emit(self.get_note())
@@ -497,6 +554,7 @@ class NotesListView(QWidget):
 
         self.note_list = NoteListView()
         self.note_list.note_selected.connect(self._on_note_selected)
+        self.note_list.delete_requested.connect(self._on_delete_from_list)
         self.stack.addWidget(self.note_list)
 
         self.editor = NoteEditor()
@@ -565,16 +623,7 @@ class NotesListView(QWidget):
             self._controller.load_image_into_label(note, self.editor.image_label)
 
     def _on_back_to_list(self):
-        if self._has_unsaved():
-            reply = QMessageBox.question(
-                self,
-                "Ungespeicherte Änderungen",
-                "Möchten Sie die Änderungen verwerfen?",
-                QMessageBox.Discard | QMessageBox.Cancel,
-                QMessageBox.Cancel,
-            )
-            if reply == QMessageBox.Cancel:
-                return
+        self.editor.try_save()
         self.stack.setCurrentIndex(0)
         if self._controller:
             self._controller.refresh()
@@ -587,7 +636,17 @@ class NotesListView(QWidget):
             return
         self._controller.save_note(note)
         self.editor.save_button.setEnabled(False)
-        QMessageBox.information(self, "Gespeichert", "Notiz wurde gespeichert.")
+
+    def _on_delete_from_list(self, note: Note):
+        reply = QMessageBox.question(
+            self,
+            "Notiz löschen",
+            f'Soll "{note.title}" wirklich gelöscht werden?',
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes and self._controller:
+            self._controller.delete_note(note)
 
     def _on_delete_note(self, note: Note):
         reply = QMessageBox.question(
